@@ -1,48 +1,40 @@
-name: build
+name: Publish Docker image (amd64)
 
 on:
   push:
-    branches: [ 'main' ]
-  pull_request:
-    branches: [ 'main' ]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+    branches:
+      - main
 
 jobs:
   build:
-    strategy:
-      matrix:
-        platform: [ubuntu-latest]
-        go-version: [ '1.21' ]
     name: Build
-    runs-on: ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
     steps:
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
         with:
-          go-version: ${{ matrix.go-version }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - uses: benjlevesque/short-sha@v2.2
-        id: short-sha
-
-      - name: Install dependencies
-        run: |
-          sudo snap install zig --classic --beta
-          docker pull crazymax/xgo:latest
-          go install github.com/crazy-max/xgo@latest
-          sudo apt install upx
-
-      - name: Build
-        run: |
-          bash build.sh dev
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v3
         with:
-          name: alist_${{ env.SHA }}
-          path: dist
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/alist:latest
+
+      - name: Delete untagged images
+        uses: Chizkiyahu/delete-untagged-ghcr-action@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository_owner: ${{ github.repository_owner }}
+          repository: ${{ github.repository }}
+          package_name: alist
+          untagged_only: true
+          owner_type: user
