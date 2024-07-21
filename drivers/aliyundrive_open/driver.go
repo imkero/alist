@@ -94,6 +94,9 @@ func (d *AliyundriveOpen) link(ctx context.Context, file model.Obj) (*model.Link
 		url = utils.Json.Get(res, "streamsUrl", d.LIVPDownloadFormat).ToString()
 	}
 	exp := time.Minute
+
+	url = strings.ReplaceAll(url, "https://cn-beijing-data.aliyundrive.net/", "https://ccp-bj29-bj-1592982087.oss-cn-beijing.aliyuncs.com/")
+
 	return &model.Link{
 		URL:        url,
 		Expiration: &exp,
