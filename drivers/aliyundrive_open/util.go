@@ -19,46 +19,76 @@ import (
 // do others that not defined in Driver interface
 
 func (d *AliyundriveOpen) _refreshToken() (string, string, error) {
-	url := d.base + "/oauth/access_token"
-	if d.OauthTokenURL != "" && d.ClientID == "" {
+	var url string
+	if strings.HasPrefix(d.OauthTokenURL, "https://api.oplist.org/") {
 		url = d.OauthTokenURL
+		var resp struct {
+			RefreshToken string `json:"refresh_token"`
+			AccessToken  string `json:"access_token"`
+			ErrorMessage string `json:"text"`
+		}
+		
+		_, err := base.RestyClient.R().
+			SetHeader("User-Agent", "Mozilla/5.0 (Macintosh; Apple macOS 15_5) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 Chrome/138.0.0.0 Openlist/425.6.30").
+			SetResult(&resp).
+			SetQueryParams(map[string]string{
+				"refresh_ui": d.RefreshToken,
+				"server_use": "true",
+				"driver_txt": "alicloud_qr",
+			}).
+			Get(u)
+		if err != nil {
+			return "", "", err
+		}
+		if resp.RefreshToken == "" || resp.AccessToken == "" {
+			if resp.ErrorMessage != "" {
+				return "", "", fmt.Errorf("failed to refresh token: %s", resp.ErrorMessage)
+			}
+			return "", "", fmt.Errorf("empty token returned from official API, a wrong refresh token may have been used")
+		}
+		return resp.RefreshToken, resp.AccessToken, nil
+	} else {
+		url = d.base + "/oauth/access_token"
+		if d.OauthTokenURL != "" && d.ClientID == "" {
+			url = d.OauthTokenURL
+		}
+		//var resp base.TokenResp
+		var e ErrResp
+		res, err := base.RestyClient.R().
+			//ForceContentType("application/json").
+			SetBody(base.Json{
+				"client_id":     d.ClientID,
+				"client_secret": d.ClientSecret,
+				"grant_type":    "refresh_token",
+				"refresh_token": d.RefreshToken,
+			}).
+			//SetResult(&resp).
+			SetError(&e).
+			Post(url)
+		if err != nil {
+			return "", "", err
+		}
+		log.Debugf("[ali_open] refresh token response: %s", res.String())
+		if e.Code != "" {
+			return "", "", fmt.Errorf("failed to refresh token: %s", e.Message)
+		}
+		refresh, access := utils.Json.Get(res.Body(), "refresh_token").ToString(), utils.Json.Get(res.Body(), "access_token").ToString()
+		if refresh == "" {
+			return "", "", fmt.Errorf("failed to refresh token: refresh token is empty, resp: %s", res.String())
+		}
+		curSub, err := getSub(d.RefreshToken)
+		if err != nil {
+			return "", "", err
+		}
+		newSub, err := getSub(refresh)
+		if err != nil {
+			return "", "", err
+		}
+		if curSub != newSub {
+			return "", "", errors.New("failed to refresh token: sub not match")
+		}
+		return refresh, access, nil
 	}
-	//var resp base.TokenResp
-	var e ErrResp
-	res, err := base.RestyClient.R().
-		//ForceContentType("application/json").
-		SetBody(base.Json{
-			"client_id":     d.ClientID,
-			"client_secret": d.ClientSecret,
-			"grant_type":    "refresh_token",
-			"refresh_token": d.RefreshToken,
-		}).
-		//SetResult(&resp).
-		SetError(&e).
-		Post(url)
-	if err != nil {
-		return "", "", err
-	}
-	log.Debugf("[ali_open] refresh token response: %s", res.String())
-	if e.Code != "" {
-		return "", "", fmt.Errorf("failed to refresh token: %s", e.Message)
-	}
-	refresh, access := utils.Json.Get(res.Body(), "refresh_token").ToString(), utils.Json.Get(res.Body(), "access_token").ToString()
-	if refresh == "" {
-		return "", "", fmt.Errorf("failed to refresh token: refresh token is empty, resp: %s", res.String())
-	}
-	curSub, err := getSub(d.RefreshToken)
-	if err != nil {
-		return "", "", err
-	}
-	newSub, err := getSub(refresh)
-	if err != nil {
-		return "", "", err
-	}
-	if curSub != newSub {
-		return "", "", errors.New("failed to refresh token: sub not match")
-	}
-	return refresh, access, nil
 }
 
 func getSub(token string) (string, error) {
