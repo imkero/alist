@@ -36,7 +36,7 @@ func (d *AliyundriveOpen) _refreshToken() (string, string, error) {
 				"server_use": "true",
 				"driver_txt": "alicloud_qr",
 			}).
-			Get(u)
+			Get(url)
 		if err != nil {
 			return "", "", err
 		}
