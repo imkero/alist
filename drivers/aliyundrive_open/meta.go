@@ -35,8 +35,12 @@ var config = driver.Config{
 
 func init() {
 	op.RegisterDriver(func() driver.Driver {
+		base := "https://openapi.alipan.com"
+		if envBase := os.Getenv("ALIYUNDRIVE_OPEN_BASE"); envBase != "" {
+			base = envBase
+		}
 		return &AliyundriveOpen{
-			base: "https://openapi.alipan.com",
+			base: base,
 		}
 	})
 }
