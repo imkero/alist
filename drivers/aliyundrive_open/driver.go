@@ -97,6 +97,7 @@ func (d *AliyundriveOpen) link(ctx context.Context, file model.Obj) (*model.Link
 	exp := time.Minute
 
 	url = strings.ReplaceAll(url, "https://cn-beijing-data.aliyundrive.net/", "https://ccp-bj29-bj-1592982087.oss-cn-beijing.aliyuncs.com/")
+	url = strings.ReplaceAll(url, "https://dl1-v6.aliyundrive.cloud/", "https://ccp-bj29-bj-1592982087.oss-cn-beijing.aliyuncs.com/")
 
 	return &model.Link{
 		URL:        url,
